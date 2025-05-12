@@ -7,39 +7,74 @@
   <style>
     body {
       margin: 0;
-      background: #000;
+      background: #121212;
       color: #fff;
-      font-family: Arial, sans-serif;
-      text-align: center;
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
     }
+
+    h1 {
+      margin-bottom: 10px;
+    }
+
+    .video-container {
+      position: relative;
+      width: 512px;
+      height: 512px;
+      border: 2px solid #444;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+
     #video, #canvas {
       position: absolute;
+      width: 512px;
+      height: 512px;
       top: 0;
       left: 0;
-      width: 100vw;
-      height: 100vh;
       object-fit: cover;
     }
+
+    #statusPanel {
+      width: 512px;
+      background: #1e1e1e;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px #000;
+      font-size: 16px;
+    }
+
     #alertBox {
-      position: fixed;
-      top: 10%;
-      left: 50%;
-      transform: translateX(-50%);
-      background-color: red;
-      padding: 15px 30px;
-      border-radius: 10px;
-      font-size: 22px;
+      color: #ff4c4c;
       font-weight: bold;
-      display: none;
-      z-index: 10;
+      font-size: 18px;
+      margin-bottom: 10px;
+    }
+
+    .label {
+      font-weight: bold;
     }
   </style>
 </head>
 <body>
-  <div id="alertBox">😴 DROWSINESS ALERT!</div>
-  <video id="video" autoplay playsinline muted></video>
-  <canvas id="canvas"></canvas>
+  <h1>Drowsiness Detector</h1>
 
+  <div class="video-container">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <div id="statusPanel">
+    <div id="alertBox"></div>
+    <div><span class="label">Status:</span> <span id="status">Initializing...</span></div>
+    <div><span class="label">EAR:</span> <span id="earValue">-</span></div>
+  </div>
+
+  <!-- TensorFlow + MediaPipe -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
@@ -49,18 +84,22 @@
     const video = document.getElementById("video");
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d");
+
     const alertBox = document.getElementById("alertBox");
+    const statusText = document.getElementById("status");
+    const earDisplay = document.getElementById("earValue");
 
     const EAR_THRESHOLD = 0.25;
-    const LEFT_EYE_IDX = [362, 385, 387, 263, 373, 380];
-    const RIGHT_EYE_IDX = [33, 160, 158, 133, 153, 144];
-    let model, earHistory = [];
+    const LEFT_EYE = [362, 385, 387, 263, 373, 380];
+    const RIGHT_EYE = [33, 160, 158, 133, 153, 144];
+    let earHistory = [];
+    let model;
 
     async function setupCamera() {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       video.srcObject = stream;
       return new Promise(resolve => {
-        video.onloadedmetadata = () => resolve(video);
+        video.onloadedmetadata = () => resolve();
       });
     }
 
@@ -71,8 +110,8 @@
       return (v1 + v2) / (2.0 * h);
     }
 
-    function getEyeCoords(landmarks, indices, width, height) {
-      return indices.map(i => [landmarks[i].x * width, landmarks[i].y * height]);
+    function getEyeCoords(landmarks, indices, w, h) {
+      return indices.map(i => [landmarks[i].x * w, landmarks[i].y * h]);
     }
 
     async function detect() {
@@ -80,13 +119,12 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       if (faces.length > 0) {
-        const keypoints = faces[0].keypoints;
-        const w = canvas.width, h = canvas.height;
+        const kp = faces[0].keypoints;
 
-        const leftEye = getEyeCoords(keypoints, LEFT_EYE_IDX, w, h);
-        const rightEye = getEyeCoords(keypoints, RIGHT_EYE_IDX, w, h);
+        const leftEye = getEyeCoords(kp, LEFT_EYE, canvas.width, canvas.height);
+        const rightEye = getEyeCoords(kp, RIGHT_EYE, canvas.width, canvas.height);
 
-        // Draw landmarks
+        // Draw eyes
         [...leftEye, ...rightEye].forEach(([x, y]) => {
           ctx.beginPath();
           ctx.arc(x, y, 2, 0, 2 * Math.PI);
@@ -94,41 +132,51 @@
           ctx.fill();
         });
 
-        const leftEAR = getEAR(leftEye);
-        const rightEAR = getEAR(rightEye);
-        const ear = (leftEAR + rightEAR) / 2.0;
+        const earL = getEAR(leftEye);
+        const earR = getEAR(rightEye);
+        const ear = ((earL + earR) / 2).toFixed(3);
+        earDisplay.textContent = ear;
 
-        earHistory.push(ear);
+        earHistory.push(parseFloat(ear));
         if (earHistory.length > 10) earHistory.shift();
+
         const avgEAR = earHistory.reduce((a, b) => a + b, 0) / earHistory.length;
 
         if (avgEAR < EAR_THRESHOLD) {
-          alertBox.style.display = "block";
+          alertBox.textContent = "😴 DROWSINESS ALERT!";
         } else {
-          alertBox.style.display = "none";
+          alertBox.textContent = "";
         }
+
+        statusText.textContent = "Face Detected ✅";
+      } else {
+        statusText.textContent = "No Face Detected ❌";
+        earDisplay.textContent = "-";
+        alertBox.textContent = "";
       }
 
       requestAnimationFrame(detect);
     }
 
     async function main() {
+      statusText.textContent = "Requesting Camera...";
       await setupCamera();
       video.play();
 
-      // Wait for video size
       await new Promise(resolve => {
         if (video.readyState >= 2) resolve();
         else video.onloadeddata = resolve;
       });
 
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      canvas.width = 512;
+      canvas.height = 512;
 
+      statusText.textContent = "Loading Model...";
       model = await faceLandmarksDetection.load(
         faceLandmarksDetection.SupportedPackages.mediapipeFacemesh
       );
 
+      statusText.textContent = "Running Detection...";
       detect();
     }
 
