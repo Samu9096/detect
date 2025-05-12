@@ -7,19 +7,15 @@
   <style>
     body {
       margin: 0;
-      font-family: 'Segoe UI', sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      background: #111;
+      background: #000;
       color: #fff;
+      font-family: Arial, sans-serif;
+      text-align: center;
     }
-    h1 {
-      margin: 20px 0 10px;
-    }
-    video, canvas {
+    #video, #canvas {
       position: absolute;
-      top: 0; left: 0;
+      top: 0;
+      left: 0;
       width: 100vw;
       height: 100vh;
       object-fit: cover;
@@ -27,28 +23,23 @@
     #alertBox {
       position: fixed;
       top: 10%;
-      background: rgba(255,0,0,0.8);
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: red;
       padding: 15px 30px;
+      border-radius: 10px;
       font-size: 22px;
       font-weight: bold;
-      border-radius: 8px;
       display: none;
-      z-index: 999;
-    }
-    #loading {
-      margin-top: 60px;
-      font-size: 18px;
+      z-index: 10;
     }
   </style>
 </head>
 <body>
-  <h1>Drowsiness Detector</h1>
   <div id="alertBox">😴 DROWSINESS ALERT!</div>
-  <div id="loading">Loading model... please wait</div>
   <video id="video" autoplay playsinline muted></video>
   <canvas id="canvas"></canvas>
 
-  <!-- TensorFlow + MediaPipe -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
@@ -59,27 +50,11 @@
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d");
     const alertBox = document.getElementById("alertBox");
-    const loading = document.getElementById("loading");
 
-    let model;
     const EAR_THRESHOLD = 0.25;
-    const LEFT_EYE = [362, 385, 387, 263, 373, 380];
-    const RIGHT_EYE = [33, 160, 158, 133, 153, 144];
-    let EAR_history = [];
-
-    function getEAR(eye) {
-      const v1 = Math.hypot(eye[1][0] - eye[5][0], eye[1][1] - eye[5][1]);
-      const v2 = Math.hypot(eye[2][0] - eye[4][0], eye[2][1] - eye[4][1]);
-      const h = Math.hypot(eye[0][0] - eye[3][0], eye[0][1] - eye[3][1]);
-      return (v1 + v2) / (2.0 * h);
-    }
-
-    function getEyeCoords(landmarks, indices) {
-      return indices.map(i => [
-        landmarks[i].x * canvas.width,
-        landmarks[i].y * canvas.height
-      ]);
-    }
+    const LEFT_EYE_IDX = [362, 385, 387, 263, 373, 380];
+    const RIGHT_EYE_IDX = [33, 160, 158, 133, 153, 144];
+    let model, earHistory = [];
 
     async function setupCamera() {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -89,32 +64,43 @@
       });
     }
 
+    function getEAR(eye) {
+      const v1 = Math.hypot(eye[1][0] - eye[5][0], eye[1][1] - eye[5][1]);
+      const v2 = Math.hypot(eye[2][0] - eye[4][0], eye[2][1] - eye[4][1]);
+      const h = Math.hypot(eye[0][0] - eye[3][0], eye[0][1] - eye[3][1]);
+      return (v1 + v2) / (2.0 * h);
+    }
+
+    function getEyeCoords(landmarks, indices, width, height) {
+      return indices.map(i => [landmarks[i].x * width, landmarks[i].y * height]);
+    }
+
     async function detect() {
       const faces = await model.estimateFaces({ input: video });
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       if (faces.length > 0) {
         const keypoints = faces[0].keypoints;
+        const w = canvas.width, h = canvas.height;
 
-        const leftEye = getEyeCoords(keypoints, LEFT_EYE);
-        const rightEye = getEyeCoords(keypoints, RIGHT_EYE);
+        const leftEye = getEyeCoords(keypoints, LEFT_EYE_IDX, w, h);
+        const rightEye = getEyeCoords(keypoints, RIGHT_EYE_IDX, w, h);
 
-        // Draw eyes
+        // Draw landmarks
         [...leftEye, ...rightEye].forEach(([x, y]) => {
           ctx.beginPath();
           ctx.arc(x, y, 2, 0, 2 * Math.PI);
-          ctx.fillStyle = 'lime';
+          ctx.fillStyle = "lime";
           ctx.fill();
         });
 
-        const earL = getEAR(leftEye);
-        const earR = getEAR(rightEye);
-        const ear = (earL + earR) / 2.0;
+        const leftEAR = getEAR(leftEye);
+        const rightEAR = getEAR(rightEye);
+        const ear = (leftEAR + rightEAR) / 2.0;
 
-        EAR_history.push(ear);
-        if (EAR_history.length > 10) EAR_history.shift();
-
-        const avgEAR = EAR_history.reduce((a, b) => a + b) / EAR_history.length;
+        earHistory.push(ear);
+        if (earHistory.length > 10) earHistory.shift();
+        const avgEAR = earHistory.reduce((a, b) => a + b, 0) / earHistory.length;
 
         if (avgEAR < EAR_THRESHOLD) {
           alertBox.style.display = "block";
@@ -128,12 +114,21 @@
 
     async function main() {
       await setupCamera();
+      video.play();
+
+      // Wait for video size
+      await new Promise(resolve => {
+        if (video.readyState >= 2) resolve();
+        else video.onloadeddata = resolve;
+      });
+
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
+
       model = await faceLandmarksDetection.load(
         faceLandmarksDetection.SupportedPackages.mediapipeFacemesh
       );
-      loading.style.display = "none";
+
       detect();
     }
 
