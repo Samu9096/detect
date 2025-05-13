@@ -1,124 +1,874 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <title>Drowsiness Detector</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <style>
-    :root{--bg:#121212;--fg:#fff;--warn:#f33;--panel:#1f1f1f}
-    body{margin:0;padding:1rem;background:var(--bg);color:var(--fg);font-family:sans-serif}
-    h1{margin:0 0 1rem;text-align:center}
-    .video-box{width:512px;height:512px;position:relative;margin:0 auto;border:2px solid #444;border-radius:8px;overflow:hidden}
-    video,canvas{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
-    .panel{width:512px;margin:1rem auto;padding:1rem;background:var(--panel);border-radius:8px}
-    .alert{color:var(--warn);font-weight:bold}
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VideoHub - Professional YouTube Clone</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .video-duration {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 2px 4px;
+            border-radius: 2px;
+            font-size: 12px;
+        }
+        
+        .hover-effect:hover {
+            transform: scale(1.03);
+            transition: transform 0.2s ease;
+        }
+        
+        ::-webkit-scrollbar {
+            width: 0;
+            background: transparent;
+        }
+        
+        .custom-progress::-webkit-progress-bar {
+            background-color: #f0f0f0;
+            border-radius: 2px;
+        }
+        
+        .custom-progress::-webkit-progress-value {
+            background-color: #ff0000;
+            border-radius: 2px;
+        }
+        
+        .video-player-container {
+            display: none;
+        }
+        
+        .home-container {
+            display: block;
+        }
+        
+        .video-thumbnail {
+            position: relative;
+            padding-top: 56.25%; /* 16:9 Aspect Ratio */
+        }
+        
+        .video-thumbnail-content {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        @media print {
+            .no-print {
+                display: none;
+            }
+            
+            body {
+                width: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            
+            .print-full {
+                display: block;
+                width: 100%;
+            }
+        }
+    </style>
 </head>
-<body>
-  <h1>Drowsiness Detector</h1>
-  <div class="video-box">
-    <video id="video" autoplay muted playsinline></video>
-    <canvas id="canvas"></canvas>
-  </div>
-  <div class="panel">
-    <div>Status: <span id="status">Loading...</span></div>
-    <div>EAR: <span id="ear">–</span></div>
-    <div class="alert" id="alert"></div>
-  </div>
+<body class="bg-gray-100 font-sans text-gray-900">
+    <!-- Header Navigation -->
+    <header class="bg-white shadow-sm sticky top-0 z-10">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <!-- Left: Logo and Menu -->
+            <div class="flex items-center">
+                <button id="menuToggle" class="mr-4 focus:outline-none">
+                    <i class="fas fa-bars text-gray-700"></i>
+                </button>
+                <div class="flex items-center cursor-pointer" onclick="showHomePage()">
+                    <i class="fab fa-youtube text-red-600 text-3xl mr-1"></i>
+                    <span class="font-bold text-xl">VideoHub</span>
+                </div>
+            </div>
+            
+            <!-- Middle: Search Bar -->
+            <div class="hidden md:flex flex-grow max-w-2xl mx-6">
+                <div class="relative w-full">
+                    <input type="text" id="searchInput" placeholder="Search" class="w-full px-4 py-2 border border-gray-300 rounded-l-full focus:outline-none focus:border-blue-500">
+                    <button onclick="searchVideos()" class="absolute right-0 top-0 h-full px-4 bg-gray-100 border border-l-0 border-gray-300 rounded-r-full hover:bg-gray-200 focus:outline-none">
+                        <i class="fas fa-search text-gray-600"></i>
+                    </button>
+                </div>
+                <button class="ml-2 p-2 rounded-full bg-gray-100 hover:bg-gray-200 focus:outline-none">
+                    <i class="fas fa-microphone text-gray-600"></i>
+                </button>
+            </div>
+            
+            <!-- Right: User Icons -->
+            <div class="flex items-center">
+                <button class="p-2 rounded-full hover:bg-gray-200 focus:outline-none">
+                    <i class="fas fa-video text-gray-700"></i>
+                </button>
+                <button class="p-2 rounded-full hover:bg-gray-200 focus:outline-none">
+                    <i class="fas fa-bell text-gray-700"></i>
+                </button>
+                <button class="ml-2 w-8 h-8 rounded-full bg-blue-500 text-white font-bold flex items-center justify-center">
+                    U
+                </button>
+            </div>
+        </div>
+        
+        <!-- Mobile Search (Shown on small screens) -->
+        <div class="md:hidden px-4 pb-3">
+            <div class="relative w-full">
+                <input type="text" placeholder="Search" class="w-full px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:border-blue-500">
+                <button class="absolute right-0 top-0 h-full px-4 bg-gray-100 border border-l-0 border-gray-300 rounded-r-full hover:bg-gray-200 focus:outline-none">
+                    <i class="fas fa-search text-gray-600"></i>
+                </button>
+            </div>
+        </div>
+    </header>
 
-  <!-- Local MediaPipe + TFJS -->
-  <script src="mediapipe/face_mesh.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
-  <script>
-  // --- config ---
-  const EAR_THRESHOLD = 0.25;
-  const LEFT_IDX  = [362,385,387,263,373,380];
-  const RIGHT_IDX = [33,160,158,133,153,144];
+    <div class="flex">
+        <!-- Sidebar Navigation -->
+        <aside id="sidebar" class="w-64 bg-white h-screen overflow-y-auto fixed left-0 top-16 shadow-sm transition-all duration-300 transform -translate-x-full md:translate-x-0">
+            <div class="py-4">
+                <!-- Main Navigation -->
+                <div class="px-4 pb-4 border-b border-gray-200">
+                    <a href="#" class="flex items-center py-2 px-4 rounded-lg hover:bg-gray-100 bg-gray-100">
+                        <i class="fas fa-home text-gray-700 mr-6"></i>
+                        <span>Home</span>
+                    </a>
+                    <a href="#" class="flex items-center py-2 px-4 rounded-lg hover:bg-gray-100">
+                        <i class="fas fa-compass text-gray-700 mr-6"></i>
+                        <span>Explore</span>
+                    </a>
+                    <a href="#" class="flex items-center py-2 px-4 rounded-lg hover:bg-gray-100">
+                        <i class="fas fa-play-circle text-gray-700 mr-6"></i>
+                        <span>Shorts</span>
+                    </a>
+                    <a href="#" class="flex items-center py-2 px-4 rounded-lg hover:bg-gray-100">
+                        <i class="fas fa-photo-video text-gray-700 mr-6"></i>
+                        <span>Subscriptions</span>
+                    </a>
+                </div>
+                
+                <!-- Library Section -->
+                <div class="px-4 py-4 border-b border-gray-200">
+                    <a href="#" class="flex items-center py-2 px-4 rounded-lg hover:bg-gray-100">
+                        <i class="fas fa-photo-video text-gray-700 mr-6"></i>
+                        <span>Library</span>
+                    </a>
+                    <a href="#" class="flex items-center py-2 px-4 rounded-lg hover:bg-gray-100">
+                        <i class="fas fa-history text-gray-700 mr-6"></i>
+                        <span>History</span>
+                    </a>
+                    <a href="#" class="flex items-center py-2 px-4 rounded-lg hover:bg-gray-100">
+                        <i class="fas fa-clock text-gray-700 mr-6"></i>
+                        <span>Watch Later</span>
+                    </a>
+                    <a href="#" class="flex items-center py-2 px-4 rounded-lg hover:bg-gray-100">
+                        <i class="fas fa-thumbs-up text-gray-700 mr-6"></i>
+                        <span>Liked Videos</span>
+                    </a>
+                </div>
+                
+                <!-- Subscriptions -->
+                <div class="px-4 py-4 border-b border-gray-200">
+                    <h3 class="font-medium text-sm text-gray-500 px-4 mb-2">SUBSCRIPTIONS</h3>
+                    <a href="#" class="flex items-center py-2 px-4 rounded-lg hover:bg-gray-100">
+                        <div class="w-6 h-6 rounded-full bg-red-500 mr-6 flex items-center justify-center text-white text-xs">T</div>
+                        <span>Tech Channel</span>
+                    </a>
+                    <a href="#" class="flex items-center py-2 px-4 rounded-lg hover:bg-gray-100">
+                        <div class="w-6 h-6 rounded-full bg-blue-500 mr-6 flex items-center justify-center text-white text-xs">M</div>
+                        <span>Music Videos</span>
+                    </a>
+                    <a href="#" class="flex items-center py-2 px-4 rounded-lg hover:bg-gray-100">
+                        <div class="w-6 h-6 rounded-full bg-green-500 mr-6 flex items-center justify-center text-white text-xs">G</div>
+                        <span>Gaming Channel</span>
+                    </a>
+                    <a href="#" class="flex items-center py-2 px-4 rounded-lg hover:bg-gray-100">
+                        <div class="w-6 h-6 rounded-full bg-yellow-500 mr-6 flex items-center justify-center text-white text-xs">C</div>
+                        <span>Cooking Shows</span>
+                    </a>
+                </div>
+                
+                <!-- More from YouTube -->
+                <div class="px-4 py-4">
+                    <h3 class="font-medium text-sm text-gray-500 px-4 mb-2">MORE FROM VIDEOHUB</h3>
+                    <a href="#" class="flex items-center py-2 px-4 rounded-lg hover:bg-gray-100">
+                        <i class="fab fa-youtube text-gray-700 mr-6"></i>
+                        <span>Premium</span>
+                    </a>
+                    <a href="#" class="flex items-center py-2 px-4 rounded-lg hover:bg-gray-100">
+                        <i class="fas fa-film text-gray-700 mr-6"></i>
+                        <span>Movies</span>
+                    </a>
+                    <a href="#" class="flex items-center py-2 px-4 rounded-lg hover:bg-gray-100">
+                        <i class="fas fa-gamepad text-gray-700 mr-6"></i>
+                        <span>Gaming</span>
+                    </a>
+                    <a href="#" class="flex items-center py-2 px-4 rounded-lg hover:bg-gray-100">
+                        <i class="fas fa-broadcast-tower text-gray-700 mr-6"></i>
+                        <span>Live</span>
+                    </a>
+                    <a href="#" class="flex items-center py-2 px-4 rounded-lg hover:bg-gray-100">
+                        <i class="fas fa-cog text-gray-700 mr-6"></i>
+                        <span>Settings</span>
+                    </a>
+                    <a href="#" class="flex items-center py-2 px-4 rounded-lg hover:bg-gray-100">
+                        <i class="fas fa-flag text-gray-700 mr-6"></i>
+                        <span>Report history</span>
+                    </a>
+                    <a href="#" class="flex items-center py-2 px-4 rounded-lg hover:bg-gray-100">
+                        <i class="fas fa-question-circle text-gray-700 mr-6"></i>
+                        <span>Help</span>
+                    </a>
+                    <a href="#" class="flex items-center py-2 px-4 rounded-lg hover:bg-gray-100">
+                        <i class="fas fa-comment-alt text-gray-700 mr-6"></i>
+                        <span>Send feedback</span>
+                    </a>
+                </div>
+            </div>
+        </aside>
 
-  // --- UI refs ---
-  const video   = document.getElementById('video');
-  const canvas  = document.getElementById('canvas');
-  const ctx     = canvas.getContext('2d');
-  const status  = document.getElementById('status');
-  const earEl   = document.getElementById('ear');
-  const alertEl = document.getElementById('alert');
+        <!-- Main Content -->
+        <main id="home-page" class="flex-grow md:ml-64 p-4 transition-all duration-300">
+            <!-- Categories Horizontal Scroll -->
+            <div class="mb-6 overflow-x-auto whitespace-nowrap py-2 no-scrollbar">
+                <button class="mr-2 px-4 py-1 bg-black text-white rounded-full text-sm focus:outline-none">All</button>
+                <button class="mr-2 px-4 py-1 bg-gray-100 rounded-full text-sm hover:bg-gray-200 focus:outline-none">Music</button>
+                <button class="mr-2 px-4 py-1 bg-gray-100 rounded-full text-sm hover:bg-gray-200 focus:outline-none">Gaming</button>
+                <button class="mr-2 px-4 py-1 bg-gray-100 rounded-full text-sm hover:bg-gray-200 focus:outline-none">Technology</button>
+                <button class="mr-2 px-4 py-1 bg-gray-100 rounded-full text-sm hover:bg-gray-200 focus:outline-none">Programming</button>
+                <button class="mr-2 px-4 py-1 bg-gray-100 rounded-full text-sm hover:bg-gray-200 focus:outline-none">Sports</button>
+                <button class="mr-2 px-4 py-1 bg-gray-100 rounded-full text-sm hover:bg-gray-200 focus:outline-none">Podcasts</button>
+                <button class="mr-2 px-4 py-1 bg-gray-100 rounded-full text-sm hover:bg-gray-200 focus:outline-none">Cooking</button>
+                <button class="mr-2 px-4 py-1 bg-gray-100 rounded-full text-sm hover:bg-gray-200 focus:outline-none">Travel</button>
+                <button class="mr-2 px-4 py-1 bg-gray-100 rounded-full text-sm hover:bg-gray-200 focus:outline-none">DIY</button>
+                <button class="mr-2 px-4 py-1 bg-gray-100 rounded-full text-sm hover:bg-gray-200 focus:outline-none">Science</button>
+            </div>
+            
+            <!-- Recommended Videos Grid -->
+            <div class="mb-8">
+                <h2 class="text-xl font-bold mb-4">Recommended</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <!-- Video 1 -->
+                    <div class="hover-effect cursor-pointer" onclick="showVideoPlayer(1)">
+                        <div class="relative">
+                            <div class="video-thumbnail">
+                                <div class="video-thumbnail-content bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center">
+                                    <i class="fas fa-play-circle text-white text-5xl"></i>
+                                </div>
+                            </div>
+                            <span class="video-duration">12:34</span>
+                        </div>
+                        <div class="mt-2 flex">
+                            <div class="flex-shrink-0 mr-2">
+                                <div class="w-9 h-9 rounded-full bg-red-500 flex items-center justify-center text-white text-xs">T</div>
+                            </div>
+                            <div>
+                                <h3 class="font-medium leading-tight">How to Build a YouTube Clone with HTML, CSS, and JavaScript</h3>
+                                <p class="text-gray-600 text-sm mt-1">TechTutorials</p>
+                                <p class="text-gray-600 text-sm">1.2M views • 2 weeks ago</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Video 2 -->
+                    <div class="hover-effect cursor-pointer" onclick="showVideoPlayer(2)">
+                        <div class="relative">
+                            <div class="video-thumbnail">
+                                <div class="video-thumbnail-content bg-gradient-to-r from-green-400 to-blue-500 flex items-center justify-center">
+                                    <i class="fas fa-play-circle text-white text-5xl"></i>
+                                </div>
+                            </div>
+                            <span class="video-duration">8:21</span>
+                        </div>
+                        <div class="mt-2 flex">
+                            <div class="flex-shrink-0 mr-2">
+                                <div class="w-9 h-9 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs">M</div>
+                            </div>
+                            <div>
+                                <h3 class="font-medium leading-tight">Top 10 Web Development Frameworks in 2023</h3>
+                                <p class="text-gray-600 text-sm mt-1">Modern Web</p>
+                                <p class="text-gray-600 text-sm">845K views • 1 month ago</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Video 3 -->
+                    <div class="hover-effect cursor-pointer" onclick="showVideoPlayer(3)">
+                        <div class="relative">
+                            <div class="video-thumbnail">
+                                <div class="video-thumbnail-content bg-gradient-to-r from-yellow-400 to-red-500 flex items-center justify-center">
+                                    <i class="fas fa-play-circle text-white text-5xl"></i>
+                                </div>
+                            </div>
+                            <span class="video-duration">15:47</span>
+                        </div>
+                        <div class="mt-2 flex">
+                            <div class="flex-shrink-0 mr-2">
+                                <div class="w-9 h-9 rounded-full bg-green-500 flex items-center justify-center text-white text-xs">G</div>
+                            </div>
+                            <div>
+                                <h3 class="font-medium leading-tight">Responsive Design Best Practices for 2023</h3>
+                                <p class="text-gray-600 text-sm mt-1">Design Masters</p>
+                                <p class="text-gray-600 text-sm">632K views • 3 weeks ago</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Video 4 -->
+                    <div class="hover-effect cursor-pointer" onclick="showVideoPlayer(4)">
+                        <div class="relative">
+                            <div class="video-thumbnail">
+                                <div class="video-thumbnail-content bg-gradient-to-r from-pink-400 to-purple-600 flex items-center justify-center">
+                                    <i class="fas fa-play-circle text-white text-5xl"></i>
+                                </div>
+                            </div>
+                            <span class="video-duration">10:05</span>
+                        </div>
+                        <div class="mt-2 flex">
+                            <div class="flex-shrink-0 mr-2">
+                                <div class="w-9 h-9 rounded-full bg-yellow-500 flex items-center justify-center text-white text-xs">C</div>
+                            </div>
+                            <div>
+                                <h3 class="font-medium leading-tight">JavaScript Tips and Tricks for Beginners</h3>
+                                <p class="text-gray-600 text-sm mt-1">Code Academy</p>
+                                <p class="text-gray-600 text-sm">1.5M views • 1 month ago</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Trending Section -->
+            <div class="mb-8">
+                <h2 class="text-xl font-bold mb-4">Trending</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <!-- Video 5 -->
+                    <div class="hover-effect cursor-pointer" onclick="showVideoPlayer(5)">
+                        <div class="relative">
+                            <div class="video-thumbnail">
+                                <div class="video-thumbnail-content bg-gradient-to-r from-red-400 to-yellow-500 flex items-center justify-center">
+                                    <i class="fas fa-play-circle text-white text-5xl"></i>
+                                </div>
+                            </div>
+                            <span class="video-duration">7:19</span>
+                        </div>
+                        <div class="mt-2 flex">
+                            <div class="flex-shrink-0 mr-2">
+                                <div class="w-9 h-9 rounded-full bg-purple-500 flex items-center justify-center text-white text-xs">N</div>
+                            </div>
+                            <div>
+                                <h3 class="font-medium leading-tight">Latest Web Trends for Developers in 2023</h3>
+                                <p class="text-gray-600 text-sm mt-1">NextGen Developers</p>
+                                <p class="text-gray-600 text-sm">2.1M views • 5 days ago</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Video 6 -->
+                    <div class="hover-effect cursor-pointer" onclick="showVideoPlayer(6)">
+                        <div class="relative">
+                            <div class="video-thumbnail">
+                                <div class="video-thumbnail-content bg-gradient-to-r from-indigo-400 to-purple-500 flex items-center justify-center">
+                                    <i class="fas fa-play-circle text-white text-5xl"></i>
+                                </div>
+                            </div>
+                            <span class="video-duration">22:45</span>
+                        </div>
+                        <div class="mt-2 flex">
+                            <div class="flex-shrink-0 mr-2">
+                                <div class="w-9 h-9 rounded-full bg-indigo-500 flex items-center justify-center text-white text-xs">D</div>
+                            </div>
+                            <div>
+                                <h3 class="font-medium leading-tight">Full Stack Development Crash Course</h3>
+                                <p class="text-gray-600 text-sm mt-1">Dev Mastery</p>
+                                <p class="text-gray-600 text-sm">1.7M views • 2 weeks ago</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Video 7 -->
+                    <div class="hover-effect cursor-pointer" onclick="showVideoPlayer(7)">
+                        <div class="relative">
+                            <div class="video-thumbnail">
+                                <div class="video-thumbnail-content bg-gradient-to-r from-green-400 to-teal-500 flex items-center justify-center">
+                                    <i class="fas fa-play-circle text-white text-5xl"></i>
+                                </div>
+                            </div>
+                            <span class="video-duration">14:32</span>
+                        </div>
+                        <div class="mt-2 flex">
+                            <div class="flex-shrink-0 mr-2">
+                                <div class="w-9 h-9 rounded-full bg-teal-500 flex items-center justify-center text-white text-xs">W</div>
+                            </div>
+                            <div>
+                                <h3 class="font-medium leading-tight">Advanced CSS Techniques for Modern Websites</h3>
+                                <p class="text-gray-600 text-sm mt-1">Web Wizards</p>
+                                <p class="text-gray-600 text-sm">925K views • 1 month ago</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Video 8 -->
+                    <div class="hover-effect cursor-pointer" onclick="showVideoPlayer(8)">
+                        <div class="relative">
+                            <div class="video-thumbnail">
+                                <div class="video-thumbnail-content bg-gradient-to-r from-orange-400 to-red-500 flex items-center justify-center">
+                                    <i class="fas fa-play-circle text-white text-5xl"></i>
+                                </div>
+                            </div>
+                            <span class="video-duration">9:58</span>
+                        </div>
+                        <div class="mt-2 flex">
+                            <div class="flex-shrink-0 mr-2">
+                                <div class="w-9 h-9 rounded-full bg-orange-500 flex items-center justify-center text-white text-xs">F</div>
+                            </div>
+                            <div>
+                                <h3 class="font-medium leading-tight">Building a YouTube Clone Step-by-Step</h3>
+                                <p class="text-gray-600 text-sm mt-1">Frontend Focus</p>
+                                <p class="text-gray-600 text-sm">1.1M views • 3 weeks ago</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recently Uploaded -->
+            <div class="mb-8">
+                <h2 class="text-xl font-bold mb-4">Recently Uploaded</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <!-- Video 9 -->
+                    <div class="hover-effect cursor-pointer" onclick="showVideoPlayer(9)">
+                        <div class="relative">
+                            <div class="video-thumbnail">
+                                <div class="video-thumbnail-content bg-gradient-to-r from-blue-300 to-indigo-500 flex items-center justify-center">
+                                    <i class="fas fa-play-circle text-white text-5xl"></i>
+                                </div>
+                            </div>
+                            <span class="video-duration">18:24</span>
+                        </div>
+                        <div class="mt-2 flex">
+                            <div class="flex-shrink-0 mr-2">
+                                <div class="w-9 h-9 rounded-full bg-blue-400 flex items-center justify-center text-white text-xs">P</div>
+                            </div>
+                            <div>
+                                <h3 class="font-medium leading-tight">Web Performance Optimization Tips</h3>
+                                <p class="text-gray-600 text-sm mt-1">Performance Pros</p>
+                                <p class="text-gray-600 text-sm">412K views • 3 days ago</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Video 10 -->
+                    <div class="hover-effect cursor-pointer" onclick="showVideoPlayer(10)">
+                        <div class="relative">
+                            <div class="video-thumbnail">
+                                <div class="video-thumbnail-content bg-gradient-to-r from-purple-300 to-pink-500 flex items-center justify-center">
+                                    <i class="fas fa-play-circle text-white text-5xl"></i>
+                                </div>
+                            </div>
+                            <span class="video-duration">11:37</span>
+                        </div>
+                        <div class="mt-2 flex">
+                            <div class="flex-shrink-0 mr-2">
+                                <div class="w-9 h-9 rounded-full bg-pink-500 flex items-center justify-center text-white text-xs">U</div>
+                            </div>
+                            <div>
+                                <h3 class="font-medium leading-tight">UI/UX Design Principles for Developers</h3>
+                                <p class="text-gray-600 text-sm mt-1">UX Masters</p>
+                                <p class="text-gray-600 text-sm">750K views • 1 week ago</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Video 11 -->
+                    <div class="hover-effect cursor-pointer" onclick="showVideoPlayer(11)">
+                        <div class="relative">
+                            <div class="video-thumbnail">
+                                <div class="video-thumbnail-content bg-gradient-to-r from-green-300 to-yellow-400 flex items-center justify-center">
+                                    <i class="fas fa-play-circle text-white text-5xl"></i>
+                                </div>
+                            </div>
+                            <span class="video-duration">15:09</span>
+                        </div>
+                        <div class="mt-2 flex">
+                            <div class="flex-shrink-0 mr-2">
+                                <div class="w-9 h-9 rounded-full bg-yellow-400 flex items-center justify-center text-white text-xs">J</div>
+                            </div>
+                            <div>
+                                <h3 class="font-medium leading-tight">JavaScript Frameworks Comparison 2023</h3>
+                                <p class="text-gray-600 text-sm mt-1">JS Journey</p>
+                                <p class="text-gray-600 text-sm">980K views • 5 days ago</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Video 12 -->
+                    <div class="hover-effect cursor-pointer" onclick="showVideoPlayer(12)">
+                        <div class="relative">
+                            <div class="video-thumbnail">
+                                <div class="video-thumbnail-content bg-gradient-to-r from-red-300 to-orange-400 flex items-center justify-center">
+                                    <i class="fas fa-play-circle text-white text-5xl"></i>
+                                </div>
+                            </div>
+                            <span class="video-duration">20:42</span>
+                        </div>
+                        <div class="mt-2 flex">
+                            <div class="flex-shrink-0 mr-2">
+                                <div class="w-9 h-9 rounded-full bg-red-400 flex items-center justify-center text-white text-xs">C</div>
+                            </div>
+                            <div>
+                                <h3 class="font-medium leading-tight">Creating Accessible Web Applications</h3>
+                                <p class="text-gray-600 text-sm mt-1">Code for All</p>
+                                <p class="text-gray-600 text-sm">520K views • 2 days ago</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <!-- Video Player Page -->
+        <div id="video-player-page" class="flex-grow md:ml-64 p-4 hidden">
+            <div class="max-w-6xl mx-auto">
+                <!-- Video Player -->
+                <div class="w-full bg-black rounded-lg overflow-hidden mb-4">
+                    <div class="relative" style="padding-top: 56.25%;">
+                        <div class="absolute inset-0 w-full h-full">
+                            <video controls playsinline webkit-playsinline class="w-full h-full">
+                                <!-- Placeholder for video source -->
+                                <source src="#" type="video/mp4">
+                                Your browser does not support the video tag.
+                            </video>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Video Info -->
+                <div class="mb-6">
+                    <h1 id="video-title" class="text-2xl font-bold mb-2">How to Build a YouTube Clone with HTML, CSS, and JavaScript</h1>
+                    <div class="flex flex-wrap justify-between items-center mb-4">
+                        <div class="text-gray-600">
+                            <span id="video-views">1.2M views</span> • <span id="video-date">Oct 15, 2023</span>
+                        </div>
+                        <div class="flex flex-wrap mt-2 sm:mt-0">
+                            <button class="flex items-center mr-4 hover:bg-gray-100 rounded-full p-2">
+                                <i class="fas fa-thumbs-up mr-2"></i>
+                                <span id="video-likes">45K</span>
+                            </button>
+                            <button class="flex items-center mr-4 hover:bg-gray-100 rounded-full p-2">
+                                <i class="fas fa-thumbs-down mr-2"></i>
+                                <span>Dislike</span>
+                            </button>
+                            <button class="flex items-center mr-4 hover:bg-gray-100 rounded-full p-2">
+                                <i class="fas fa-share mr-2"></i>
+                                <span>Share</span>
+                            </button>
+                            <button class="flex items-center mr-4 hover:bg-gray-100 rounded-full p-2">
+                                <i class="fas fa-download mr-2"></i>
+                                <span>Download</span>
+                            </button>
+                            <button class="flex items-center hover:bg-gray-100 rounded-full p-2">
+                                <i class="fas fa-ellipsis-h"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Channel Info -->
+                    <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                        <div class="flex items-center">
+                            <div id="channel-avatar" class="w-12 h-12 rounded-full bg-red-500 flex items-center justify-center text-white text-lg mr-3">T</div>
+                            <div>
+                                <h3 id="channel-name" class="font-bold">TechTutorials</h3>
+                                <p id="subscriber-count" class="text-gray-600 text-sm">1.2M subscribers</p>
+                            </div>
+                        </div>
+                        <button class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-full font-medium focus:outline-none">
+                            Subscribe
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Video Description -->
+                <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                    <div id="video-description" class="text-gray-800">
+                        <p>In this comprehensive tutorial, we walk through building a YouTube clone using HTML, CSS, and JavaScript. You'll learn how to create responsive layouts, implement video players, and structure a complex web application.</p>
+                        <p class="mt-2">🔗 Resources mentioned in this video:</p>
+                        <ul class="list-disc ml-5 mt-1">
+                            <li>HTML5 Video API Documentation</li>
+                            <li>CSS Grid & Flexbox Cheatsheet</li>
+                            <li>JavaScript Media Controls Library</li>
+                        </ul>
+                        <p class="mt-2">👨‍💻 Source code: <a href="#" class="text-blue-600">github.com/techtutorials/youtube-clone</a></p>
+                        <p class="mt-2 text-gray-600">
+                            #WebDevelopment #HTML #CSS #JavaScript #YouTubeClone
+                        </p>
+                    </div>
+                </div>
+                
+                <!-- Comments Section -->
+                <div class="mb-8">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold"><span id="comment-count">1,245</span> Comments</h3>
+                        <div class="flex items-center">
+                            <i class="fas fa-sort-amount-down mr-2"></i>
+                            <span>Sort by</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Add Comment -->
+                    <div class="flex mb-6">
+                        <div class="flex-shrink-0 mr-3">
+                            <div class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm">U</div>
+                        </div>
+                        <div class="flex-grow">
+                            <input type="text" placeholder="Add a comment..." class="w-full p-2 border-b border-gray-300 focus:outline-none focus:border-blue-500">
+                        </div>
+                    </div>
+                    
+                    <!-- Comments List -->
+                    <div id="comments-list">
+                        <!-- Comment 1 -->
+                        <div class="flex mb-6">
+                            <div class="flex-shrink-0 mr-3">
+                                <div class="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white text-sm">J</div>
+                            </div>
+                            <div>
+                                <div class="flex items-center">
+                                    <h4 class="font-bold mr-2">John Dev</h4>
+                                    <span class="text-gray-600 text-sm">2 days ago</span>
+                                </div>
+                                <p class="mt-1">This tutorial was incredibly helpful! I've been trying to build something similar for a project and this cleared up a lot of questions I had about the layout structure.</p>
+                                <div class="flex items-center mt-2 text-gray-600 text-sm">
+                                    <button class="flex items-center mr-4">
+                                        <i class="fas fa-thumbs-up mr-1"></i>
+                                        <span>245</span>
+                                    </button>
+                                    <button class="flex items-center mr-4">
+                                        <i class="fas fa-thumbs-down mr-1"></i>
+                                    </button>
+                                    <button class="mr-4">Reply</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Comment 2 -->
+                        <div class="flex mb-6">
+                            <div class="flex-shrink-0 mr-3">
+                                <div class="w-10 h-10 rounded-full bg-purple-500 flex items-center justify-center text-white text-sm">S</div>
+                            </div>
+                            <div>
+                                <div class="flex items-center">
+                                    <h4 class="font-bold mr-2">Sarah Coder</h4>
+                                    <span class="text-gray-600 text-sm">1 week ago</span>
+                                </div>
+                                <p class="mt-1">Could you make a follow-up video on how to implement the recommendation algorithm? That would be amazing!</p>
+                                <div class="flex items-center mt-2 text-gray-600 text-sm">
+                                    <button class="flex items-center mr-4">
+                                        <i class="fas fa-thumbs-up mr-1"></i>
+                                        <span>128</span>
+                                    </button>
+                                    <button class="flex items-center mr-4">
+                                        <i class="fas fa-thumbs-down mr-1"></i>
+                                    </button>
+                                    <button class="mr-4">Reply</button>
+                                </div>
+                                
+                                <!-- Nested Reply -->
+                                <div class="mt-4 ml-6">
+                                    <div class="flex">
+                                        <div class="flex-shrink-0 mr-3">
+                                            <div class="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center text-white text-xs">T</div>
+                                        </div>
+                                        <div>
+                                            <div class="flex items-center">
+                                                <h4 class="font-bold mr-2">TechTutorials</h4>
+                                                <span class="text-gray-600 text-sm">5 days ago</span>
+                                            </div>
+                                            <p class="mt-1">Great suggestion! I'll add that to my list of upcoming tutorials.</p>
+                                            <div class="flex items-center mt-2 text-gray-600 text-sm">
+                                                <button class="flex items-center mr-4">
+                                                    <i class="fas fa-thumbs-up mr-1"></i>
+                                                    <span>67</span>
+                                                </button>
+                                                <button class="flex items-center mr-4">
+                                                    <i class="fas fa-thumbs-down mr-1"></i>
+                                                </button>
+                                                <button class="mr-4">Reply</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Comment 3 -->
+                        <div class="flex mb-6">
+                            <div class="flex-shrink-0 mr-3">
+                                <div class="w-10 h-10 rounded-full bg-yellow-500 flex items-center justify-center text-white text-sm">M</div>
+                            </div>
+                            <div>
+                                <div class="flex items-center">
+                                    <h4 class="font-bold mr-2">Mike WebDev</h4>
+                                    <span class="text-gray-600 text-sm">3 days ago</span>
+                                </div>
+                                <p class="mt-1">I implemented this on my website and it works perfectly! One suggestion: maybe add a section on implementing dark mode in a future video?</p>
+                                <div class="flex items-center mt-2 text-gray-600 text-sm">
+                                    <button class="flex items-center mr-4">
+                                        <i class="fas fa-thumbs-up mr-1"></i>
+                                        <span>89</span>
+                                    </button>
+                                    <button class="flex items-center mr-4">
+                                        <i class="fas fa-thumbs-down mr-1"></i>
+                                    </button>
+                                    <button class="mr-4">Reply</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Show More Comments Button -->
+                    <button class="text-blue-600 font-medium focus:outline-none">Show more comments</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-  let model, earHistory=[];
-
-  // compute EAR
-  function getEAR(pts) {
-    const [p1,p2,p3,p4,p5,p6] = pts;
-    const A = Math.hypot(p2.x-p6.x, p2.y-p6.y);
-    const B = Math.hypot(p3.x-p5.x, p3.y-p5.y);
-    const C = Math.hypot(p1.x-p4.x, p1.y-p4.y);
-    return (A+B)/(2*C);
-  }
-
-  async function setupCamera() {
-    const stream = await navigator.mediaDevices.getUserMedia({ video:true });
-    video.srcObject = stream;
-    await new Promise(r=>video.onloadedmetadata=r);
-    canvas.width  = video.videoWidth;
-    canvas.height = video.videoHeight;
-  }
-
-  async function loadModel() {
-    // Tell TFJS to load from our local folder
-    model = await faceLandmarksDetection.load(
-      faceLandmarksDetection.SupportedPackages.mediapipeFacemesh,
-      { 
-        maxFaces:1,
-        modelUrl: 'tfjs_models/model.json'
-      }
-    );
-  }
-
-  async function detectLoop() {
-    const predictions = await model.estimateFaces({input:video, flipHorizontal:true});
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-
-    if (predictions.length) {
-      status.textContent = 'Face Detected ✅';
-      const keypoints = predictions[0].keypoints;
-      const left  = LEFT_IDX.map(i=>keypoints[i]);
-      const right = RIGHT_IDX.map(i=>keypoints[i]);
-      const ear   = ((getEAR(left)+getEAR(right))/2).toFixed(3);
-      earEl.textContent = ear;
-      earHistory.push(parseFloat(ear));
-      if (earHistory.length>10) earHistory.shift();
-      const avg = earHistory.reduce((a,b)=>a+b)/earHistory.length;
-      alertEl.textContent = avg<EAR_THRESHOLD ? '⚠️ Drowsiness!' : '';
-      // draw
-      [...left,...right].forEach(p=>{
-        ctx.beginPath();
-        ctx.arc(p.x*p.videoWidth, p.y*p.videoHeight, 2,0,2*Math.PI);
-        ctx.fillStyle = 'lime';
-        ctx.fill();
-      });
-    } else {
-      status.textContent = 'No Face ❌';
-      earEl.textContent = '–';
-      alertEl.textContent = '';
-    }
-    requestAnimationFrame(detectLoop);
-  }
-
-  // --- service worker registration (for caching) ---
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js')
-      .catch(console.error);
-  }
-
-  // --- kick off ---
-  (async()=>{
-    await setupCamera();
-    status.textContent='Loading model…';
-    const t0=performance.now();
-    await loadModel();
-    const t1=performance.now();
-    status.textContent=`Model loaded in ${((t1-t0)/1000).toFixed(2)}s`;
-    detectLoop();
-  })();
-  </script>
+    <!-- JavaScript -->
+    <script>
+        // Toggle sidebar menu on mobile
+        document.getElementById('menuToggle').addEventListener('click', function() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('-translate-x-full');
+        });
+        
+        // Video data (would normally come from a database)
+        const videoData = [
+            {
+                id: 1,
+                title: "How to Build a YouTube Clone with HTML, CSS, and JavaScript",
+                views: "1.2M views",
+                date: "Oct 15, 2023",
+                likes: "45K",
+                channelName: "TechTutorials",
+                channelAvatar: "T",
+                avatarColor: "bg-red-500",
+                subscribers: "1.2M subscribers",
+                description: "In this comprehensive tutorial, we walk through building a YouTube clone using HTML, CSS, and JavaScript. You'll learn how to create responsive layouts, implement video players, and structure a complex web application.\n\n🔗 Resources mentioned in this video:\n- HTML5 Video API Documentation\n- CSS Grid & Flexbox Cheatsheet\n- JavaScript Media Controls Library\n\n👨‍💻 Source code: github.com/techtutorials/youtube-clone\n\n#WebDevelopment #HTML #CSS #JavaScript #YouTubeClone",
+                commentCount: "1,245"
+            },
+            {
+                id: 2,
+                title: "Top 10 Web Development Frameworks in 2023",
+                views: "845K views",
+                date: "Sep 28, 2023",
+                likes: "32K",
+                channelName: "Modern Web",
+                channelAvatar: "M",
+                avatarColor: "bg-blue-500",
+                subscribers: "980K subscribers",
+                description: "In this video, we cover the top 10 web development frameworks that are dominating the industry in 2023. From React to Vue, Angular to Svelte, we analyze the pros and cons of each framework and provide practical examples of when to use them.\n\n⏱️ Timestamps:\n00:00 Introduction\n01:24 Framework #10\n03:45 Framework #9\n...\n\n📚 Additional Resources:\n- Framework Comparison Chart: modernweb.com/framework-comparison\n- GitHub Repository: github.com/modernweb/framework-examples\n\n#WebDev #Frameworks #Programming",
+                commentCount: "842"
+            },
+            {
+                id: 3,
+                title: "Responsive Design Best Practices for 2023",
+                views: "632K views",
+                date: "Oct 2, 2023",
+                likes: "28K",
+                channelName: "Design Masters",
+                channelAvatar: "G",
+                avatarColor: "bg-green-500",
+                subscribers: "750K subscribers",
+                description: "Learn the latest responsive design best practices for 2023 in this comprehensive guide. We cover everything from CSS Grid to Flexbox, media queries to container queries, and more.\n\n📱 Topics covered:\n- Mobile-first design principles\n- Fluid typography techniques\n- Advanced CSS Grid layouts\n- Responsive images strategy\n- Accessibility considerations\n\n🔗 Resources mentioned: designmasters.com/responsive-resources\n\n#ResponsiveDesign #WebDesign #CSS #Frontend",
+                commentCount: "723"
+            },
+            {
+                id: 4,
+                title: "JavaScript Tips and Tricks for Beginners",
+                views: "1.5M views",
+                date: "Sep 20, 2023",
+                likes: "76K",
+                channelName: "Code Academy",
+                channelAvatar: "C",
+                avatarColor: "bg-yellow-500",
+                subscribers: "2.1M subscribers",
+                description: "This tutorial covers essential JavaScript tips and tricks that every beginner should know. Learn how to write cleaner, more efficient code with these practical examples.\n\n⭐ Key topics:\n- Array methods you should master\n- Understanding scope and closures\n- Destructuring techniques\n- Template literals magic\n- Arrow functions simplified\n\n💻 Practice exercises: codeacademy.com/js-exercises\n\n#JavaScript #WebDevelopment #CodingTips",
+                commentCount: "1,892"
+            },
+            {
+                id: 5,
+                title: "Latest Web Trends for Developers in 2023",
+                views: "2.1M views",
+                date: "Oct 10, 2023",
+                likes: "92K",
+                channelName: "NextGen Developers",
+                channelAvatar: "N",
+                avatarColor: "bg-purple-500",
+                subscribers: "3.2M subscribers",
+                description: "Stay ahead of the curve with this overview of the latest web development trends in 2023. From WebAssembly to Edge Computing, we cover the technologies shaping the future of the web.\n\n🔮 Trends covered:\n- Web3 and decentralized applications\n- AI-powered development tools\n- Next-generation JavaScript frameworks\n- Progressive Web Apps evolution\n- Serverless architecture advancements\n\n#WebDevelopment #TechTrends #Programming",
+                commentCount: "2,453"
+            },
+            // More videos would be added here in a real app
+        ];
+        
+        // Function to show video player page
+        function showVideoPlayer(videoId) {
+            // Hide home page and show video player page
+            document.getElementById('home-page').style.display = 'none';
+            document.getElementById('video-player-page').style.display = 'block';
+            
+            // Get video data (in a real app, this would fetch from an API)
+            const video = videoData.find(v => v.id === videoId) || videoData[0];
+            
+            // Update video page with data
+            document.getElementById('video-title').textContent = video.title;
+            document.getElementById('video-views').textContent = video.views;
+            document.getElementById('video-date').textContent = video.date;
+            document.getElementById('video-likes').textContent = video.likes;
+            document.getElementById('channel-name').textContent = video.channelName;
+            document.getElementById('subscriber-count').textContent = video.subscribers;
+            document.getElementById('comment-count').textContent = video.commentCount;
+            
+            // Update channel avatar
+            const channelAvatar = document.getElementById('channel-avatar');
+            channelAvatar.textContent = video.channelAvatar;
+            channelAvatar.className = `w-12 h-12 rounded-full ${video.avatarColor} flex items-center justify-center text-white text-lg mr-3`;
+            
+            // Update video description
+            document.getElementById('video-description').innerHTML = video.description.replace(/\n/g, '<br>');
+            
+            // In a real application, we would load the actual video here
+            // document.querySelector('#video-player-page video source').src = `https://example.com/videos/${videoId}.mp4`;
+            // document.querySelector('#video-player-page video').load();
+        }
+        
+        // Function to show home page
+        function showHomePage() {
+            document.getElementById('video-player-page').style.display = 'none';
+            document.getElementById('home-page').style.display = 'block';
+        }
+        
+        // Function to simulate search
+        function searchVideos() {
+            const searchTerm = document.getElementById('searchInput').value.trim();
+            if (searchTerm) {
+                alert(`Searching for: ${searchTerm}\n\nIn a real application, this would fetch and display search results.`);
+            }
+        }
+        
+        // Event listener for search input (pressing Enter)
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchVideos();
+            }
+        });
+    </script>
 </body>
 </html>
